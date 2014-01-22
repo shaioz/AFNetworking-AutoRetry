@@ -10,9 +10,10 @@
                                                 autoRetryOf:(int)timesToRetry {
     
     void (^retryBlock)(AFHTTPRequestOperation *, NSError *) = ^(AFHTTPRequestOperation *operation, NSError *error) {
-        if (timesToRetry > 0) {
+        int retryCount = timesToRetry;
+        if (retryCount > 0) {
             NSLog(@"AutoRetry: Request failed: %@, retry begining...", error.localizedDescription);
-            AFHTTPRequestOperation *retryOperation = [self HTTPRequestOperationWithRequest:request success:success failure:failure autoRetryOf:timesToRetry-1];
+            AFHTTPRequestOperation *retryOperation = [self HTTPRequestOperationWithRequest:request success:success failure:failure autoRetryOf:retryCount-1];
             [self.operationQueue addOperation:retryOperation];
         } else {
             NSLog(@"AutoRetry: Request failed: %@, no more retries allowed! executing supplied failure block...", error.localizedDescription);
