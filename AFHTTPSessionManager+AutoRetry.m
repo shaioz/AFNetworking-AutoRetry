@@ -5,35 +5,39 @@
 #import "AFHTTPSessionManager+AutoRetry.h"
 
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "OCUnusedMethodInspection"
+
 @implementation AFHTTPSessionManager (AutoRetry)
 
-
+- (NSURLSessionDataTask *)requestUrlWithAutoRetry:(int)timesToRetry
+                           originalRequestCreator:(NSURLSessionDataTask *(^)(void (^)(NSURLSessionDataTask *, NSError *)))taskCreator
+                                  originalFailure:(void(^)(NSURLSessionDataTask *, NSError *))failure {
+    
+    void(^retryBlock)(NSURLSessionDataTask *, NSError *) = ^(NSURLSessionDataTask *task, NSError *error) {
+        int retryCount = timesToRetry;
+        if (retryCount > 0) {
+            NSLog(@"AutoRetry: Request failed: %@, retry begining...", error.localizedDescription);
+            [self requestUrlWithAutoRetry:timesToRetry-1 originalRequestCreator:taskCreator originalFailure:failure];
+        } else {
+            NSLog(@"AutoRetry: Request failed: %@, no more retries allowed! executing supplied failure block...", error.localizedDescription);
+            failure(task, error);
+            NSLog(@"AutoRetry: done.");
+        } 
+    };
+    NSURLSessionDataTask *task = taskCreator(retryBlock);
+    return task;
+}
 
 - (NSURLSessionDataTask *)GET:(NSString *)URLString
                    parameters:(NSDictionary *)parameters
-                      success:(void (^)(NSURLSessionDataTask *task, id responseObject))success
+                      success:(void (^)(NSURLSessionDataTask *task, id respo))success
                       failure:(void (^)(NSURLSessionDataTask *task, NSError *error))failure
                     autoRetry:(int)timesToRetry
 {
-    NSMutableURLRequest *request = [self.requestSerializer requestWithMethod:@"GET" URLString:[[NSURL URLWithString:URLString relativeToURL:self.baseURL] absoluteString] parameters:parameters error:nil];
-
-    __block NSURLSessionDataTask *task = [self dataTaskWithRequest:request completionHandler:^(NSURLResponse * __unused response, id responseObject, NSError *error) {
-        if (error) {
-            if (timesToRetry > 0) {
-                NSLog(@"AutoRetry: Request failed: %@, retry begining...", error.localizedDescription);
-                [self GET:URLString parameters:parameters success:success failure:failure autoRetry:timesToRetry-1];
-            } else if (failure) {
-                failure(task, error);
-            }
-        } else {
-            if (success) {
-                success(task, responseObject);
-            }
-        }
-    }];
-
-    [task resume];
-
+    NSURLSessionDataTask *task = [self requestUrlWithAutoRetry:timesToRetry originalRequestCreator:^NSURLSessionDataTask *(void (^retryBlock)(NSURLSessionDataTask *, NSError *)) {
+        return [self GET:URLString parameters:parameters success:success failure:retryBlock];
+    } originalFailure:failure];
     return task;
 }
 
@@ -43,25 +47,9 @@
                        failure:(void (^)(NSURLSessionDataTask *task, NSError *error))failure
                      autoRetry:(int)timesToRetry
 {
-    NSMutableURLRequest *request = [self.requestSerializer requestWithMethod:@"HEAD" URLString:[[NSURL URLWithString:URLString relativeToURL:self.baseURL] absoluteString] parameters:parameters error:nil];
-
-    __block NSURLSessionDataTask *task = [self dataTaskWithRequest:request completionHandler:^(NSURLResponse * __unused response, id __unused responseObject, NSError *error) {
-        if (timesToRetry > 0) {
-            NSLog(@"AutoRetry: Request failed: %@, retry begining...", error.localizedDescription);
-            [self HEAD:URLString parameters:parameters success:success failure:failure autoRetry:timesToRetry-1];
-        } else if (error) {
-            if (failure) {
-                failure(task, error);
-            }
-        } else {
-            if (success) {
-                success(task);
-            }
-        }
-    }];
-
-    [task resume];
-
+    NSURLSessionDataTask *task = [self requestUrlWithAutoRetry:timesToRetry originalRequestCreator:^NSURLSessionDataTask *(void (^retryBlock)(NSURLSessionDataTask *, NSError *)) {
+        return [self HEAD:URLString parameters:parameters success:success failure:retryBlock];
+    } originalFailure:failure];
     return task;
 }
 
@@ -71,25 +59,9 @@
                        failure:(void (^)(NSURLSessionDataTask *task, NSError *error))failure
                      autoRetry:(int)timesToRetry
 {
-    NSMutableURLRequest *request = [self.requestSerializer requestWithMethod:@"POST" URLString:[[NSURL URLWithString:URLString relativeToURL:self.baseURL] absoluteString] parameters:parameters error:nil];
-
-    __block NSURLSessionDataTask *task = [self dataTaskWithRequest:request completionHandler:^(NSURLResponse * __unused response, id responseObject, NSError *error) {
-        if (timesToRetry > 0) {
-            NSLog(@"AutoRetry: Request failed: %@, retry begining...", error.localizedDescription);
-            [self POST:URLString parameters:parameters success:success failure:failure autoRetry:timesToRetry-1];
-        } else if (error) {
-            if (failure) {
-                failure(task, error);
-            }
-        } else {
-            if (success) {
-                success(task, responseObject);
-            }
-        }
-    }];
-
-    [task resume];
-
+    NSURLSessionDataTask *task = [self requestUrlWithAutoRetry:timesToRetry originalRequestCreator:^NSURLSessionDataTask *(void (^retryBlock)(NSURLSessionDataTask *, NSError *)) {
+        return [self POST:URLString parameters:parameters success:success failure:retryBlock];
+    } originalFailure:failure];
     return task;
 }
 
@@ -101,25 +73,9 @@
                      autoRetry:(int)timesToRetry
 
 {
-    NSMutableURLRequest *request = [self.requestSerializer multipartFormRequestWithMethod:@"POST" URLString:[[NSURL URLWithString:URLString relativeToURL:self.baseURL] absoluteString] parameters:parameters constructingBodyWithBlock:block error:nil];
-
-    __block NSURLSessionDataTask *task = [self uploadTaskWithStreamedRequest:request progress:nil completionHandler:^(NSURLResponse * __unused response, id responseObject, NSError *error) {
-        if (timesToRetry > 0) {
-            NSLog(@"AutoRetry: Request failed: %@, retry begining...", error.localizedDescription);
-            [self POST:URLString parameters:parameters constructingBodyWithBlock:block success:success failure:failure autoRetry:timesToRetry-1];
-        } else if (error) {
-            if (failure) {
-                failure(task, error);
-            }
-        } else {
-            if (success) {
-                success(task, responseObject);
-            }
-        }
-    }];
-
-    [task resume];
-
+    NSURLSessionDataTask *task = [self requestUrlWithAutoRetry:timesToRetry originalRequestCreator:^NSURLSessionDataTask *(void (^retryBlock)(NSURLSessionDataTask *, NSError *)) {
+        return [self POST:URLString parameters:parameters constructingBodyWithBlock:block success:success failure:retryBlock];
+    } originalFailure:failure];
     return task;
 }
 
@@ -129,25 +85,10 @@
                       failure:(void (^)(NSURLSessionDataTask *task, NSError *error))failure
                     autoRetry:(int)timesToRetry
 {
-    NSMutableURLRequest *request = [self.requestSerializer requestWithMethod:@"PUT" URLString:[[NSURL URLWithString:URLString relativeToURL:self.baseURL] absoluteString] parameters:parameters error:nil];
 
-    __block NSURLSessionDataTask *task = [self dataTaskWithRequest:request completionHandler:^(NSURLResponse * __unused response, id responseObject, NSError *error) {
-        if (timesToRetry > 0) {
-            NSLog(@"AutoRetry: Request failed: %@, retry begining...", error.localizedDescription);
-            [self PUT:URLString parameters:parameters success:success failure:failure autoRetry:timesToRetry-1];
-        } else if (error) {
-            if (failure) {
-                failure(task, error);
-            }
-        } else {
-            if (success) {
-                success(task, responseObject);
-            }
-        }
-    }];
-
-    [task resume];
-
+    NSURLSessionDataTask *task = [self requestUrlWithAutoRetry:timesToRetry originalRequestCreator:^NSURLSessionDataTask *(void (^retryBlock)(NSURLSessionDataTask *, NSError *)) {
+        return [self PUT:URLString parameters:parameters success:success failure:retryBlock];
+    } originalFailure:failure];
     return task;
 }
 
@@ -157,25 +98,10 @@
                         failure:(void (^)(NSURLSessionDataTask *task, NSError *error))failure
                      autoRetry:(int)timesToRetry
 {
-    NSMutableURLRequest *request = [self.requestSerializer requestWithMethod:@"PATCH" URLString:[[NSURL URLWithString:URLString relativeToURL:self.baseURL] absoluteString] parameters:parameters error:nil];
 
-    __block NSURLSessionDataTask *task = [self dataTaskWithRequest:request completionHandler:^(NSURLResponse * __unused response, id responseObject, NSError *error) {
-        if (timesToRetry > 0) {
-            NSLog(@"AutoRetry: Request failed: %@, retry begining...", error.localizedDescription);
-            [self PATCH:URLString parameters:parameters success:success failure:failure autoRetry:timesToRetry-1];
-        } else if (error) {
-            if (failure) {
-                failure(task, error);
-            }
-        } else {
-            if (success) {
-                success(task, responseObject);
-            }
-        }
-    }];
-
-    [task resume];
-
+    NSURLSessionDataTask *task = [self requestUrlWithAutoRetry:timesToRetry originalRequestCreator:^NSURLSessionDataTask *(void (^retryBlock)(NSURLSessionDataTask *, NSError *)) {
+        return [self PATCH:URLString parameters:parameters success:success failure:retryBlock];
+    } originalFailure:failure];
     return task;
 }
 
@@ -185,26 +111,12 @@
                          failure:(void (^)(NSURLSessionDataTask *task, NSError *error))failure
                        autoRetry:(int)timesToRetry
 {
-    NSMutableURLRequest *request = [self.requestSerializer requestWithMethod:@"DELETE" URLString:[[NSURL URLWithString:URLString relativeToURL:self.baseURL] absoluteString] parameters:parameters error:nil];
-
-    __block NSURLSessionDataTask *task = [self dataTaskWithRequest:request completionHandler:^(NSURLResponse * __unused response, id responseObject, NSError *error) {
-        if (timesToRetry > 0) {
-            NSLog(@"AutoRetry: Request failed: %@, retry begining...", error.localizedDescription);
-            [self DELETE:URLString parameters:parameters success:success failure:failure autoRetry:timesToRetry-1];
-        } else if (error) {
-            if (failure) {
-                failure(task, error);
-            }
-        } else {
-            if (success) {
-                success(task, responseObject);
-            }
-        }
-    }];
-
-    [task resume];
-
+    NSURLSessionDataTask *task = [self requestUrlWithAutoRetry:timesToRetry originalRequestCreator:^NSURLSessionDataTask *(void (^retryBlock)(NSURLSessionDataTask *, NSError *)) {
+        return [self DELETE:URLString parameters:parameters success:success failure:retryBlock];
+    } originalFailure:failure];
     return task;
 }
 
 @end
+
+#pragma clang diagnostic pop

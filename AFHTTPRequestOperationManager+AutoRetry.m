@@ -3,7 +3,11 @@
 
 #import "AFHTTPRequestOperationManager+AutoRetry.h"
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "OCUnusedMethodInspection"
+
 @implementation AFHTTPRequestOperationManager (AutoRetry)
+
 - (AFHTTPRequestOperation *)HTTPRequestOperationWithRequest:(NSURLRequest *)request
                                                     success:(void (^)(AFHTTPRequestOperation *operation, id responseObject))success
                                                     failure:(void (^)(AFHTTPRequestOperation *operation, NSError *error))failure
@@ -129,3 +133,5 @@
 }
 
 @end
+
+#pragma clang diagnostic pop
