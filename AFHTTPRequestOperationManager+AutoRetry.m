@@ -2,46 +2,86 @@
 // Created by Shai Ohev Zion on 1/21/14.
 
 #import "AFHTTPRequestOperationManager+AutoRetry.h"
+#import "ObjcAssociatedObjectHelpers.h"
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "OCUnusedMethodInspection"
 
+
 @implementation AFHTTPRequestOperationManager (AutoRetry)
+
+SYNTHESIZE_ASC_OBJ(__operationsDict, __setOperationsDict);
+
+- (void)createOperationsDict {
+    [self setOperationsDict:[[NSMutableDictionary alloc] init]];
+}
+
+- (NSMutableDictionary *)operationsDict {
+    if (!self.__operationsDict) {
+        [self createOperationsDict];
+    }
+    return self.__operationsDict;
+}
+
+- (void)setOperationsDict:(id)operationsDict {
+    [self __setOperationsDict:operationsDict];
+}
 
 - (AFHTTPRequestOperation *)HTTPRequestOperationWithRequest:(NSURLRequest *)request
                                                     success:(void (^)(AFHTTPRequestOperation *operation, id responseObject))success
                                                     failure:(void (^)(AFHTTPRequestOperation *operation, NSError *error))failure
                                                 autoRetryOf:(int)timesToRetry retryInterval:(int)intervalInSeconds {
-    
+
     void (^retryBlock)(AFHTTPRequestOperation *, NSError *) = ^(AFHTTPRequestOperation *operation, NSError *error) {
-        int retryCount = timesToRetry;
-        if (retryCount > 0) {
-            NSLog(@"AutoRetry: Request failed: %@, retry begining...", error.localizedDescription);
-            AFHTTPRequestOperation *retryOperation = [self HTTPRequestOperationWithRequest:request success:success failure:failure autoRetryOf:retryCount-1 retryInterval:intervalInSeconds];
+        NSMutableDictionary *retryOperationDict = self.operationsDict[request];
+        int originalRetryCount = [retryOperationDict[@"originalRetryCount"] intValue];
+        int currentRetryCount = [retryOperationDict[@"currentRetryCount"] intValue];
+        if (currentRetryCount > 0) {
+            NSLog(@"AutoRetry: Request failed: %@, retry %d out of %d begining...",
+                    error.localizedDescription, originalRetryCount - currentRetryCount, originalRetryCount);
+            AFHTTPRequestOperation *retryOperation = [self HTTPRequestOperationWithRequest:request
+                                                                                   success:success
+                                                                                   failure:failure
+                                                                               autoRetryOf:currentRetryCount - 1
+                                                                             retryInterval:intervalInSeconds];
             void (^addRetryOperation)() = ^{
                 [self.operationQueue addOperation:retryOperation];
             };
             if (intervalInSeconds > 0) {
                 NSLog(@"AutoRetry: Delaying retry for %d seconds...", intervalInSeconds);
-                dispatch_time_t delay = dispatch_time(0, (int64_t)(intervalInSeconds * NSEC_PER_SEC));
-                dispatch_after(delay, dispatch_get_main_queue(), ^(void){
+                dispatch_time_t delay = dispatch_time(0, (int64_t) (intervalInSeconds * NSEC_PER_SEC));
+                dispatch_after(delay, dispatch_get_main_queue(), ^(void) {
                     addRetryOperation();
                 });
             } else {
                 addRetryOperation();
             }
         } else {
-            NSLog(@"AutoRetry: Request failed: %@, no more retries allowed! executing supplied failure block...", error.localizedDescription);
+            NSLog(@"AutoRetry: Request failed %d times: %@", originalRetryCount, error.localizedDescription);
+            NSLog(@"AutoRetry: No more retries allowed! executing supplied failure block...");
             failure(operation, error);
             NSLog(@"AutoRetry: done.");
         }
     };
+    NSMutableDictionary *operationDict = self.operationsDict[request];
+    if (!operationDict) {
+        operationDict = [NSMutableDictionary new];
+        operationDict[@"originalRetryCount"] = [NSNumber numberWithInt:timesToRetry];
+    }
+    operationDict[@"currentRetryCount"] = [NSNumber numberWithInt:timesToRetry];
+    NSMutableDictionary *newDict = [NSMutableDictionary dictionaryWithDictionary:self.operationsDict];
+    newDict[request] = operationDict;
+    self.operationsDict = newDict;
+    AFHTTPRequestOperation *operation = [self HTTPRequestOperationWithRequest:request
+                                                                      success:^(AFHTTPRequestOperation *operation, id responseObj) {
+                                                                          NSMutableDictionary *successOperationDict = self.operationsDict[request];
+                                                                          int originalRetryCount = [successOperationDict[@"originalRetryCount"] intValue];
+                                                                          int currentRetryCount = [successOperationDict[@"currentRetryCount"] intValue];
+                                                                          NSLog(@"AutoRetry: success with %d retries, running success block...", originalRetryCount - currentRetryCount);
+                                                                          success(operation, responseObj);
+                                                                          NSLog(@"AutoRetry: done.");
 
-    AFHTTPRequestOperation *operation = [self HTTPRequestOperationWithRequest:request success:^(AFHTTPRequestOperation *operation, id responseObj) {
-        NSLog(@"AutoRetry: success, running success block...");
-        success(operation, responseObj);
-        NSLog(@"AutoRetry: done.");
-    } failure:retryBlock];
+                                                                      } failure:retryBlock];
 
     return operation;
 }
@@ -80,8 +120,7 @@
                          success:(void (^)(AFHTTPRequestOperation *operation, id responseObject))success
                          failure:(void (^)(AFHTTPRequestOperation *operation, NSError *error))failure
                        autoRetry:(int)timesToRetry
-                   retryInterval:(int)intervalInSeconds
-{
+                   retryInterval:(int)intervalInSeconds {
     NSMutableURLRequest *request = [self.requestSerializer requestWithMethod:@"POST" URLString:[[NSURL URLWithString:URLString relativeToURL:self.baseURL] absoluteString] parameters:parameters error:nil];
     AFHTTPRequestOperation *operation = [self HTTPRequestOperationWithRequest:request success:success failure:failure autoRetryOf:timesToRetry retryInterval:intervalInSeconds];
     [self.operationQueue addOperation:operation];
@@ -95,8 +134,7 @@
                         success:(void (^)(AFHTTPRequestOperation *operation, id responseObject))success
                         failure:(void (^)(AFHTTPRequestOperation *operation, NSError *error))failure
                       autoRetry:(int)timesToRetry
-                  retryInterval:(int)intervalInSeconds
-{
+                  retryInterval:(int)intervalInSeconds {
     NSMutableURLRequest *request = [self.requestSerializer requestWithMethod:@"GET" URLString:[[NSURL URLWithString:URLString relativeToURL:self.baseURL] absoluteString] parameters:parameters error:nil];
     AFHTTPRequestOperation *operation = [self HTTPRequestOperationWithRequest:request success:success failure:failure autoRetryOf:timesToRetry retryInterval:intervalInSeconds];
     [self.operationQueue addOperation:operation];
@@ -109,14 +147,13 @@
                          success:(void (^)(AFHTTPRequestOperation *operation))success
                          failure:(void (^)(AFHTTPRequestOperation *operation, NSError *error))failure
                        autoRetry:(int)timesToRetry
-                   retryInterval:(int)intervalInSeconds
-{
+                   retryInterval:(int)intervalInSeconds {
     NSMutableURLRequest *request = [self.requestSerializer requestWithMethod:@"HEAD" URLString:[[NSURL URLWithString:URLString relativeToURL:self.baseURL] absoluteString] parameters:parameters error:nil];
     AFHTTPRequestOperation *operation = [self HTTPRequestOperationWithRequest:request success:^(AFHTTPRequestOperation *requestOperation, __unused id responseObject) {
         if (success) {
             success(requestOperation);
         }
-    } failure:failure autoRetryOf:timesToRetry retryInterval:intervalInSeconds];
+    }                                                                 failure:failure autoRetryOf:timesToRetry retryInterval:intervalInSeconds];
     [self.operationQueue addOperation:operation];
 
     return operation;
@@ -128,8 +165,7 @@
                          success:(void (^)(AFHTTPRequestOperation *operation, id responseObject))success
                          failure:(void (^)(AFHTTPRequestOperation *operation, NSError *error))failure
                        autoRetry:(int)timesToRetry
-                   retryInterval:(int)intervalInSeconds
-{
+                   retryInterval:(int)intervalInSeconds {
     NSMutableURLRequest *request = [self.requestSerializer multipartFormRequestWithMethod:@"POST" URLString:[[NSURL URLWithString:URLString relativeToURL:self.baseURL] absoluteString] parameters:parameters constructingBodyWithBlock:block error:nil];
     AFHTTPRequestOperation *operation = [self HTTPRequestOperationWithRequest:request success:success failure:failure autoRetryOf:timesToRetry retryInterval:intervalInSeconds];
     [self.operationQueue addOperation:operation];
@@ -142,8 +178,7 @@
                         success:(void (^)(AFHTTPRequestOperation *operation, id responseObject))success
                         failure:(void (^)(AFHTTPRequestOperation *operation, NSError *error))failure
                       autoRetry:(int)timesToRetry
-                  retryInterval:(int)intervalInSeconds
-{
+                  retryInterval:(int)intervalInSeconds {
     NSMutableURLRequest *request = [self.requestSerializer requestWithMethod:@"PUT" URLString:[[NSURL URLWithString:URLString relativeToURL:self.baseURL] absoluteString] parameters:parameters error:nil];
     AFHTTPRequestOperation *operation = [self HTTPRequestOperationWithRequest:request success:success failure:failure autoRetryOf:timesToRetry retryInterval:intervalInSeconds];
     [self.operationQueue addOperation:operation];
@@ -156,8 +191,7 @@
                           success:(void (^)(AFHTTPRequestOperation *operation, id responseObject))success
                           failure:(void (^)(AFHTTPRequestOperation *operation, NSError *error))failure
                         autoRetry:(int)timesToRetry
-                    retryInterval:(int)intervalInSeconds
-{
+                    retryInterval:(int)intervalInSeconds {
     NSMutableURLRequest *request = [self.requestSerializer requestWithMethod:@"PATCH" URLString:[[NSURL URLWithString:URLString relativeToURL:self.baseURL] absoluteString] parameters:parameters error:nil];
     AFHTTPRequestOperation *operation = [self HTTPRequestOperationWithRequest:request success:success failure:failure autoRetryOf:timesToRetry retryInterval:intervalInSeconds];
     [self.operationQueue addOperation:operation];
@@ -170,8 +204,7 @@
                            success:(void (^)(AFHTTPRequestOperation *operation, id responseObject))success
                            failure:(void (^)(AFHTTPRequestOperation *operation, NSError *error))failure
                          autoRetry:(int)timesToRetry
-                     retryInterval:(int)intervalInSeconds
-{
+                     retryInterval:(int)intervalInSeconds {
     NSMutableURLRequest *request = [self.requestSerializer requestWithMethod:@"DELETE" URLString:[[NSURL URLWithString:URLString relativeToURL:self.baseURL] absoluteString] parameters:parameters error:nil];
     AFHTTPRequestOperation *operation = [self HTTPRequestOperationWithRequest:request success:success failure:failure autoRetryOf:timesToRetry retryInterval:intervalInSeconds];
     [self.operationQueue addOperation:operation];

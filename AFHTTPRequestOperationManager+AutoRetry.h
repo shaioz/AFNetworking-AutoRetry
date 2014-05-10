@@ -107,6 +107,9 @@
                            failure:(void (^)(AFHTTPRequestOperation *operation, NSError *error))failure
                          autoRetry:(int)timesToRetry
                      retryInterval:(int)intervalInSeconds;
+
+@property (strong) NSMutableDictionary *operationsDict;
+
 @end
 
 #pragma clang diagnostic pop
