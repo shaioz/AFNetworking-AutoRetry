@@ -7,12 +7,14 @@
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "OCUnusedMethodInspection"
 
+typedef int (^RetryDelayCalcBlock)(int, int, int); // int totalRetriesAllowed, int retriesRemaining, int delayBetweenIntervalsModifier
+
 @interface AFHTTPRequestOperationManager (AutoRetry)
 
 - (AFHTTPRequestOperation *)HTTPRequestOperationWithRequest:(NSURLRequest *)request
                                                     success:(void (^)(AFHTTPRequestOperation *operation, id responseObject))success
                                                     failure:(void (^)(AFHTTPRequestOperation *operation, NSError *error))failure
-                                                autoRetryOf:(int)timesToRetry
+                                                autoRetryOf:(int)retriesRemaining
                                               retryInterval:(int)intervalInSeconds;
 
 - (AFHTTPRequestOperation *)POST:(NSString *)URLString
@@ -108,7 +110,8 @@
                          autoRetry:(int)timesToRetry
                      retryInterval:(int)intervalInSeconds;
 
-@property (strong) NSMutableDictionary *operationsDict;
+@property (strong) id operationsDict;
+@property (copy) id retryDelayCalcBlock;
 
 @end
 
