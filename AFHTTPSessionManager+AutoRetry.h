@@ -10,7 +10,7 @@
 
 @interface AFHTTPSessionManager (AutoRetry)
 
-- (NSURLSessionDataTask *)requestUrlWithAutoRetry:(int)timesToRetry
+- (NSURLSessionDataTask *)requestUrlWithAutoRetry:(int)retriesRemaining
                                     retryInterval:(int)intervalInSeconds
                            originalRequestCreator:(NSURLSessionDataTask *(^)(void (^)(NSURLSessionDataTask *, NSError *)))taskCreator
                                   originalFailure:(void (^)(NSURLSessionDataTask *, NSError *))failure;
@@ -101,6 +101,10 @@
                          success:(void (^)(NSURLSessionDataTask *task, id responseObject))success
                          failure:(void (^)(NSURLSessionDataTask *task, NSError *error))failure
                        autoRetry:(int)timesToRetry;
+
+@property (strong) id tasksDict;
+@property (copy) id retryDelayCalcBlock;
+
 @end
 
 #pragma clang diagnostic pop

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
+   LastUpgradeVersion = "0510"
    version = "1.3">
    <BuildAction
       parallelizeBuildables = "YES"
@@ -14,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "35D93512DFDB6E9BC9EF7ADC"
-               BuildableName = "libAFNetworking-AutoRetry.a"
+               BuildableName = "AFNetworking-AutoRetry"
                BlueprintName = "AFNetworking-AutoRetry"
-               ReferencedContainer = "container:AFNetworking-AutoRetry2.xcodeproj">
+               ReferencedContainer = "container:AFNetworking-AutoRetry.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
