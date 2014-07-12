@@ -81,7 +81,7 @@ SYNTHESIZE_ASC_OBJ(__retryDelayCalcBlock, setRetryDelayCalcBlock);
         operationDict = [NSMutableDictionary new];
         operationDict[@"originalRetryCount"] = [NSNumber numberWithInt:retriesRemaining];
     }
-    operationDict[@"currentRetryCount"] = [NSNumber numberWithInt:retriesRemaining];
+    operationDict[@"retriesRemainingCount"] = [NSNumber numberWithInt:retriesRemaining];
     NSMutableDictionary *newDict = [NSMutableDictionary dictionaryWithDictionary:self.operationsDict];
     newDict[request] = operationDict;
     self.operationsDict = newDict;
