@@ -50,7 +50,10 @@ SYNTHESIZE_ASC_OBJ(__retryDelayCalcBlock, setRetryDelayCalcBlock);
         if (retriesRemainingCount > 0) {
             ARLog(@"AutoRetry: Request failed: %@, retry %d out of %d begining...",
                     error.localizedDescription, originalRetryCount - retriesRemainingCount + 1, originalRetryCount);
-       		AFHTTPRequestOperation *retryOperation = [self HTTPRequestOperationWithRequest:request
+        
+        NSMutableURLRequest * newRequest = [request mutableCopy];
+        newRequest.timeoutInterval *= 1.5f;
+        AFHTTPRequestOperation *retryOperation = [self HTTPRequestOperationWithRequest:newRequest
                                                                                    success:success
                                                                                    failure:failure
                                                                                autoRetryOf:retriesRemainingCount - 1

@@ -40,11 +40,17 @@ SYNTHESIZE_ASC_OBJ(__retryDelayCalcBlock, setRetryDelayCalcBlock);
     return self.__tasksDict;
 }
 
+- (void)setTimeout:(NSTimeInterval)timeout {
+    [NSURLSessionConfiguration defaultSessionConfiguration].timeoutIntervalForRequest = timeout;
+    [NSURLSessionConfiguration defaultSessionConfiguration].timeoutIntervalForResource = timeout;
+}
+
 - (NSURLSessionDataTask *)requestUrlWithAutoRetry:(int)retriesRemaining
                                     retryInterval:(int)intervalInSeconds
                            originalRequestCreator:(NSURLSessionDataTask *(^)(void (^)(NSURLSessionDataTask *, NSError *)))taskCreator
                                   originalFailure:(void(^)(NSURLSessionDataTask *, NSError *))failure {
     
+    static NSTimeInterval timeout = 0;
     id taskcreatorCopy = [taskCreator copy];
     void(^retryBlock)(NSURLSessionDataTask *, NSError *) = ^(NSURLSessionDataTask *task, NSError *error) {
         NSMutableDictionary *retryOperationDict = self.tasksDict[taskcreatorCopy];
@@ -54,6 +60,7 @@ SYNTHESIZE_ASC_OBJ(__retryDelayCalcBlock, setRetryDelayCalcBlock);
             ARLog(@"AutoRetry: Request failed: %@, retry %d out of %d begining...",
                 error.localizedDescription, originalRetryCount - retriesRemainingCount + 1, originalRetryCount);
             void (^addRetryOperation)() = ^{
+            [self setTimeout:[NSURLSessionConfiguration defaultSessionConfiguration].timeoutIntervalForRequest*1.5f];
                 [self requestUrlWithAutoRetry:retriesRemaining - 1 retryInterval:intervalInSeconds originalRequestCreator:taskCreator originalFailure:failure];
             };
             RetryDelayCalcBlock delayCalc = self.retryDelayCalcBlock;
@@ -79,6 +86,10 @@ SYNTHESIZE_ASC_OBJ(__retryDelayCalcBlock, setRetryDelayCalcBlock);
     if (!taskDict) {
         taskDict = [NSMutableDictionary new];
         taskDict[@"originalRetryCount"] = [NSNumber numberWithInt:retriesRemaining];
+        if (!timeout) {
+            timeout = [NSURLSessionConfiguration defaultSessionConfiguration].timeoutIntervalForRequest;
+    }
+        [self setTimeout:timeout];
     }
     taskDict[@"retriesRemainingCount"] = [NSNumber numberWithInt:retriesRemaining];
     NSMutableDictionary *newDict = [NSMutableDictionary dictionaryWithDictionary:self.tasksDict];
