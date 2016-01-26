@@ -40,6 +40,70 @@ SYNTHESIZE_ASC_OBJ(__retryDelayCalcBlock, setRetryDelayCalcBlock);
     return self.__tasksDict;
 }
 
+// subclass and overide this method if necessary
+- (BOOL)isErrorFatal:(NSError *)error {
+    switch (error.code) {
+        case kCFHostErrorHostNotFound:
+        case kCFHostErrorUnknown: // Query the kCFGetAddrInfoFailureKey to get the value returned from getaddrinfo; lookup in netdb.h
+            // HTTP errors
+        case kCFErrorHTTPAuthenticationTypeUnsupported:
+        case kCFErrorHTTPBadCredentials:
+        case kCFErrorHTTPParseFailure:
+        case kCFErrorHTTPRedirectionLoopDetected:
+        case kCFErrorHTTPBadURL:
+        case kCFErrorHTTPBadProxyCredentials:
+        case kCFErrorPACFileError:
+        case kCFErrorPACFileAuth:
+        case kCFStreamErrorHTTPSProxyFailureUnexpectedResponseToCONNECTMethod:
+            // Error codes for CFURLConnection and CFURLProtocol
+        case kCFURLErrorUnknown:
+        case kCFURLErrorCancelled:
+        case kCFURLErrorBadURL:
+        case kCFURLErrorUnsupportedURL:
+        case kCFURLErrorHTTPTooManyRedirects:
+        case kCFURLErrorBadServerResponse:
+        case kCFURLErrorUserCancelledAuthentication:
+        case kCFURLErrorUserAuthenticationRequired:
+        case kCFURLErrorZeroByteResource:
+        case kCFURLErrorCannotDecodeRawData:
+        case kCFURLErrorCannotDecodeContentData:
+        case kCFURLErrorCannotParseResponse:
+        case kCFURLErrorInternationalRoamingOff:
+        case kCFURLErrorCallIsActive:
+        case kCFURLErrorDataNotAllowed:
+        case kCFURLErrorRequestBodyStreamExhausted:
+        case kCFURLErrorFileDoesNotExist:
+        case kCFURLErrorFileIsDirectory:
+        case kCFURLErrorNoPermissionsToReadFile:
+        case kCFURLErrorDataLengthExceedsMaximum:
+            // SSL errors
+        case kCFURLErrorServerCertificateHasBadDate:
+        case kCFURLErrorServerCertificateUntrusted:
+        case kCFURLErrorServerCertificateHasUnknownRoot:
+        case kCFURLErrorServerCertificateNotYetValid:
+        case kCFURLErrorClientCertificateRejected:
+        case kCFURLErrorClientCertificateRequired:
+        case kCFURLErrorCannotLoadFromNetwork:
+            // Cookie errors
+        case kCFHTTPCookieCannotParseCookieFile:
+            // Errors originating from CFNetServices
+        case kCFNetServiceErrorUnknown:
+        case kCFNetServiceErrorCollision:
+        case kCFNetServiceErrorNotFound:
+        case kCFNetServiceErrorInProgress:
+        case kCFNetServiceErrorBadArgument:
+        case kCFNetServiceErrorCancel:
+        case kCFNetServiceErrorInvalid:
+            // Special case
+        case 101: // null address
+        case 102: // Ignore "Frame Load Interrupted" errors. Seen after app store links.
+            return YES;
+        default:
+            break;
+    }
+    return NO;
+}
+
 - (void)setTimeout:(NSTimeInterval)timeout {
     [NSURLSessionConfiguration defaultSessionConfiguration].timeoutIntervalForRequest = timeout;
     [NSURLSessionConfiguration defaultSessionConfiguration].timeoutIntervalForResource = timeout;
@@ -53,10 +117,25 @@ SYNTHESIZE_ASC_OBJ(__retryDelayCalcBlock, setRetryDelayCalcBlock);
     static NSTimeInterval timeout = 0;
     id taskcreatorCopy = [taskCreator copy];
     void(^retryBlock)(NSURLSessionDataTask *, NSError *) = ^(NSURLSessionDataTask *task, NSError *error) {
+        // error is fatal, do not retry
+        if ([self isErrorFatal:error]) {
+            ARLog(@"AutoRetry: Request failed with error: %@", error.localizedDescription);
+            failure(task, error);
+            return;
+        }
+        
+        // reached the maximum retry count
         NSMutableDictionary *retryOperationDict = self.tasksDict[taskcreatorCopy];
         int originalRetryCount = [retryOperationDict[@"originalRetryCount"] intValue];
         int retriesRemainingCount = [retryOperationDict[@"retriesRemainingCount"] intValue];
-        if (retriesRemainingCount > 0) {
+        if (!retriesRemainingCount) {
+            ARLog(@"AutoRetry: Request failed %d times: %@", originalRetryCount, error.localizedDescription);
+            ARLog(@"AutoRetry: No more retries allowed! executing supplied failure block...");
+            failure(task, error);
+            ARLog(@"AutoRetry: done.");
+        }
+        
+        // Retry the request
             ARLog(@"AutoRetry: Request failed: %@, retry %d out of %d begining...",
                 error.localizedDescription, originalRetryCount - retriesRemainingCount + 1, originalRetryCount);
             void (^addRetryOperation)() = ^{
@@ -74,12 +153,6 @@ SYNTHESIZE_ASC_OBJ(__retryDelayCalcBlock, setRetryDelayCalcBlock);
             } else {
                 addRetryOperation();
             }
-        } else {
-            ARLog(@"AutoRetry: Request failed %d times: %@", originalRetryCount, error.localizedDescription);
-            ARLog(@"AutoRetry: No more retries allowed! executing supplied failure block...");
-            failure(task, error);
-            ARLog(@"AutoRetry: done.");
-        } 
     };
     NSURLSessionDataTask *task = taskCreator(retryBlock);
     NSMutableDictionary *taskDict = self.tasksDict[taskcreatorCopy];
