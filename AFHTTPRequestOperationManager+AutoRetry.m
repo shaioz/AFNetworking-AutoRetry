@@ -48,9 +48,9 @@ SYNTHESIZE_ASC_OBJ(__retryDelayCalcBlock, setRetryDelayCalcBlock);
         int originalRetryCount = [retryOperationDict[@"originalRetryCount"] intValue];
         int retriesRemainingCount = [retryOperationDict[@"retriesRemainingCount"] intValue];
         if (retriesRemainingCount > 0) {
-            NSLog(@"AutoRetry: Request failed: %@, retry %d out of %d begining...",
+            ARLog(@"AutoRetry: Request failed: %@, retry %d out of %d begining...",
                     error.localizedDescription, originalRetryCount - retriesRemainingCount + 1, originalRetryCount);
-            AFHTTPRequestOperation *retryOperation = [self HTTPRequestOperationWithRequest:request
+       		AFHTTPRequestOperation *retryOperation = [self HTTPRequestOperationWithRequest:request
                                                                                    success:success
                                                                                    failure:failure
                                                                                autoRetryOf:retriesRemainingCount - 1
@@ -61,7 +61,7 @@ SYNTHESIZE_ASC_OBJ(__retryDelayCalcBlock, setRetryDelayCalcBlock);
             RetryDelayCalcBlock delayCalc = self.retryDelayCalcBlock;
             int intervalToWait = delayCalc(originalRetryCount, retriesRemainingCount, intervalInSeconds);
             if (intervalToWait > 0) {
-                NSLog(@"AutoRetry: Delaying retry for %d seconds...", intervalToWait);
+                ARLog(@"AutoRetry: Delaying retry for %d seconds...", intervalToWait);
                 dispatch_time_t delay = dispatch_time(0, (int64_t) (intervalToWait * NSEC_PER_SEC));
                 dispatch_after(delay, dispatch_get_main_queue(), ^(void) {
                     addRetryOperation();
@@ -70,10 +70,10 @@ SYNTHESIZE_ASC_OBJ(__retryDelayCalcBlock, setRetryDelayCalcBlock);
                 addRetryOperation();
             }
         } else {
-            NSLog(@"AutoRetry: Request failed %d times: %@", originalRetryCount, error.localizedDescription);
-            NSLog(@"AutoRetry: No more retries allowed! executing supplied failure block...");
+            ARLog(@"AutoRetry: Request failed %d times: %@", originalRetryCount, error.localizedDescription);
+            ARLog(@"AutoRetry: No more retries allowed! executing supplied failure block...");
             failure(operation, error);
-            NSLog(@"AutoRetry: done.");
+            ARLog(@"AutoRetry: done.");
         }
     };
     NSMutableDictionary *operationDict = self.operationsDict[request];
@@ -90,9 +90,9 @@ SYNTHESIZE_ASC_OBJ(__retryDelayCalcBlock, setRetryDelayCalcBlock);
                                                                           NSMutableDictionary *successOperationDict = self.operationsDict[request];
                                                                           int originalRetryCount = [successOperationDict[@"originalRetryCount"] intValue];
                                                                           int retriesRemainingCount = [successOperationDict[@"retriesRemainingCount"] intValue];
-                                                                          NSLog(@"AutoRetry: success with %d retries, running success block...", originalRetryCount - retriesRemainingCount);
+                                                                          ARLog(@"AutoRetry: success with %d retries, running success block...", originalRetryCount - retriesRemainingCount);
                                                                           success(operation, responseObj);
-                                                                          NSLog(@"AutoRetry: done.");
+                                                                          ARLog(@"AutoRetry: done.");
 
                                                                       } failure:retryBlock];
 

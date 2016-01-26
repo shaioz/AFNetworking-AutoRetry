@@ -44,13 +44,14 @@ SYNTHESIZE_ASC_OBJ(__retryDelayCalcBlock, setRetryDelayCalcBlock);
                                     retryInterval:(int)intervalInSeconds
                            originalRequestCreator:(NSURLSessionDataTask *(^)(void (^)(NSURLSessionDataTask *, NSError *)))taskCreator
                                   originalFailure:(void(^)(NSURLSessionDataTask *, NSError *))failure {
+    
     id taskcreatorCopy = [taskCreator copy];
     void(^retryBlock)(NSURLSessionDataTask *, NSError *) = ^(NSURLSessionDataTask *task, NSError *error) {
         NSMutableDictionary *retryOperationDict = self.tasksDict[taskcreatorCopy];
         int originalRetryCount = [retryOperationDict[@"originalRetryCount"] intValue];
         int retriesRemainingCount = [retryOperationDict[@"retriesRemainingCount"] intValue];
         if (retriesRemainingCount > 0) {
-            NSLog(@"AutoRetry: Request failed: %@, retry %d out of %d begining...",
+            ARLog(@"AutoRetry: Request failed: %@, retry %d out of %d begining...",
                 error.localizedDescription, originalRetryCount - retriesRemainingCount + 1, originalRetryCount);
             void (^addRetryOperation)() = ^{
                 [self requestUrlWithAutoRetry:retriesRemaining - 1 retryInterval:intervalInSeconds originalRequestCreator:taskCreator originalFailure:failure];
@@ -58,7 +59,7 @@ SYNTHESIZE_ASC_OBJ(__retryDelayCalcBlock, setRetryDelayCalcBlock);
             RetryDelayCalcBlock delayCalc = self.retryDelayCalcBlock;
             int intervalToWait = delayCalc(originalRetryCount, retriesRemainingCount, intervalInSeconds);
             if (intervalToWait > 0) {
-                NSLog(@"AutoRetry: Delaying retry for %d seconds...", intervalToWait);
+                ARLog(@"AutoRetry: Delaying retry for %d seconds...", intervalToWait);
                 dispatch_time_t delay = dispatch_time(0, (int64_t)(intervalToWait * NSEC_PER_SEC));
                 dispatch_after(delay, dispatch_get_main_queue(), ^(void){
                     addRetryOperation();
@@ -67,10 +68,10 @@ SYNTHESIZE_ASC_OBJ(__retryDelayCalcBlock, setRetryDelayCalcBlock);
                 addRetryOperation();
             }
         } else {
-            NSLog(@"AutoRetry: Request failed %d times: %@", originalRetryCount, error.localizedDescription);
-            NSLog(@"AutoRetry: No more retries allowed! executing supplied failure block...");
+            ARLog(@"AutoRetry: Request failed %d times: %@", originalRetryCount, error.localizedDescription);
+            ARLog(@"AutoRetry: No more retries allowed! executing supplied failure block...");
             failure(task, error);
-            NSLog(@"AutoRetry: done.");
+            ARLog(@"AutoRetry: done.");
         } 
     };
     NSURLSessionDataTask *task = taskCreator(retryBlock);
