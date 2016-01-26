@@ -2,6 +2,12 @@
 // Created by Shai Ohev Zion on 1/23/14.
 // Copyright (c) 2014 shaioz. All rights reserved.
 
+#ifdef DEBUG
+    #define ARLog(format, ...)  NSLog(format, ## __VA_ARGS__)
+#else
+    #define ARLog(...)
+#endif
+
 #import <Foundation/Foundation.h>
 #import "AFHTTPSessionManager.h"
 
