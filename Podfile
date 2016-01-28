@@ -1,2 +1,2 @@
-pod 'AFNetworking', '~> 2'
+pod 'AFNetworking', '~> 3'
 pod 'ObjcAssociatedObjectHelpers'
