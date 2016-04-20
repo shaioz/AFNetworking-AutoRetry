@@ -108,6 +108,11 @@ SYNTHESIZE_ASC_OBJ(__retryDelayCalcBlock, setRetryDelayCalcBlock);
                                                 autoRetryOf:(int)retriesRemaining retryInterval:(int)intervalInSeconds {
 
     void (^retryBlock)(AFHTTPRequestOperation *, NSError *) = ^(AFHTTPRequestOperation *operation, NSError *error) {
+        // operation is cancelled, exit early
+        if (operation.isCancelled) {
+            return;
+        }
+
         // error is fatal, do not retry
         if ([self isErrorFatal:error]) {
             ARLog(@"AutoRetry: Request failed with error: %@", error.localizedDescription);
