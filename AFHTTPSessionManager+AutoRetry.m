@@ -133,6 +133,7 @@ SYNTHESIZE_ASC_OBJ(__retryDelayCalcBlock, setRetryDelayCalcBlock);
             ARLog(@"AutoRetry: No more retries allowed! executing supplied failure block...");
             failure(task, error);
             ARLog(@"AutoRetry: done.");
+            return;
         }
         
         // Retry the request
