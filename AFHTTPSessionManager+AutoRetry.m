@@ -117,6 +117,11 @@ SYNTHESIZE_ASC_OBJ(__retryDelayCalcBlock, setRetryDelayCalcBlock);
     static NSTimeInterval timeout = 0;
     id taskcreatorCopy = [taskCreator copy];
     void(^retryBlock)(NSURLSessionDataTask *, NSError *) = ^(NSURLSessionDataTask *task, NSError *error) {
+        // operation has been cancelled, exit immediatelly
+        if (operation.isCancelled) {
+            return;
+        }
+
         // error is fatal, do not retry
         if ([self isErrorFatal:error]) {
             ARLog(@"AutoRetry: Request failed with error: %@", error.localizedDescription);

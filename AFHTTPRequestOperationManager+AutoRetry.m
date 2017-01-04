@@ -108,7 +108,7 @@ SYNTHESIZE_ASC_OBJ(__retryDelayCalcBlock, setRetryDelayCalcBlock);
                                                 autoRetryOf:(int)retriesRemaining retryInterval:(int)intervalInSeconds {
 
     void (^retryBlock)(AFHTTPRequestOperation *, NSError *) = ^(AFHTTPRequestOperation *operation, NSError *error) {
-        // operation is cancelled, exit early
+        // operation has been cancelled, exit immediatelly
         if (operation.isCancelled) {
             return;
         }
